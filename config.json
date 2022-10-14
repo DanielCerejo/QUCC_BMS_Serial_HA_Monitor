@@ -1,8 +1,8 @@
 {
-    "name": "Daly Smart BMS",
-    "version": "1.4.2",
-    "slug": "dalybms",
-    "description": "Monitors a Daly Smart BMS through UART USB",
+    "name": "DCC Smart BMS",
+    "version": "1.0.2",
+    "slug": "dcc-bms",
+    "description": "Monitors a Smart BMS through UART USB",
     "arch": ["amd64", "armv7", "i386"],
     "startup": "application",
     "boot": "auto",

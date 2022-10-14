@@ -1,2 +1,2 @@
-# HA Addon for Daly Smart BMS
-Home assistant addon that monitors  BMS under (develop)# BMS-ha
+# HA Addon for QUCC Smart BMS
+Home assistant addon that monitors  QUCC BMS 
