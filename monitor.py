@@ -97,7 +97,7 @@ def get_battery_state():
     if power>0:
         power_charging=power
     else:
-        power_discharging=power
+        power_discharging=-power
 
     remaining_capacity = int.from_bytes(buffer[8:10], byteorder='big', signed=False) / 100
     nominal_capacity = int.from_bytes(buffer[10:12], byteorder='big', signed=False) / 100
