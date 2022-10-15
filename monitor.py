@@ -9,7 +9,7 @@ import paho.mqtt.client as mqtt
 
 tempconfigpublished = False
 
-print('Starting BMS monitor...', flush=True)
+print('Starting QUCC Serial BMS monitor...', flush=True)
 
 # ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)  # open serial port
 #ser = serial.Serial(os.environ['DEVICE'], 9600, timeout=3, write_timeout=2, exclusive=True)  # open serial port
@@ -37,8 +37,11 @@ client.publish(STATE_TOPIC + '_voltage/config', voltageHaConf, 0, True)
 currentHaConf = '{"device_class": "current", "name": "Battery Current", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "A", "value_template": "{{ value_json.current}}", "unique_id": "' + devId + '_current", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_current/config', currentHaConf, 0, True)
 
-powerHaConf = '{"device_class": "power", "name": "Battery Power", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "W", "value_template": "{{ value_json.power}}", "unique_id": "' + devId + '_power", ' + deviceConf + '}' 
-client.publish(STATE_TOPIC + 'power/config', powerHaConf, 0, True)
+power_chargingHaConf = '{"device_class": "power", "name": "Battery Power Charging", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "W", "value_template": "{{ value_json.power_charging}}", "unique_id": "' + devId + '_power_charging", ' + deviceConf + '}' 
+client.publish(STATE_TOPIC + '_power_charging/config', power_chargingHaConf, 0, True)
+
+power_dischargeHaConf = '{"device_class": "power", "name": "Battery Power Discharging", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "W", "value_template": "{{ value_json.power_discharging}}", "unique_id": "' + devId + '_power_discharging", ' + deviceConf + '}' 
+client.publish(STATE_TOPIC + '_power_discharging/config', power_dischargeHaConf, 0, True)
 
 remaining_capacityHaConf = '{"device_class": "current", "name": "Battery Remaining Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Ah", "value_template": "{{ value_json.remaining_capacity}}", "unique_id": "' + devId + '_remaining_capacity", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_remaining_capacity/config', remaining_capacityHaConf, 0, True)
@@ -54,8 +57,6 @@ client.publish(STATE_TOPIC + '_temperature_avg/config', tempAvgHaConf, 0, True)
 
 
 
-
-
 def cmd(command):
     res = []
     ser.reset_input_buffer()
@@ -64,7 +65,7 @@ def cmd(command):
     s = ser.read(50)
     if (s == b''):
         return res        
-    print(binascii.hexlify(s, ' '), flush=True)
+  #  print(binascii.hexlify(s, ' '), flush=True)
     res.append(s)
     return res
 
@@ -73,9 +74,6 @@ def publish(topic, data):
         client.publish(topic, data, 0, False)
     except Exception as e:
         print("Error sending to mqtt: " + str(e))
-
-
-
 
 
 
@@ -94,13 +92,20 @@ def get_battery_state():
     voltage = int.from_bytes(buffer[4:6], byteorder='big', signed=False) / 100
     current = int.from_bytes(buffer[6:8], byteorder='big', signed=True) / 100
     power = round(voltage * current, 2)
+    power_charging=0
+    power_discharging=0
+    if power>0:
+        power_charging=power
+    else:
+        power_discharging=power
+
     remaining_capacity = int.from_bytes(buffer[8:10], byteorder='big', signed=False) / 100
     nominal_capacity = int.from_bytes(buffer[10:12], byteorder='big', signed=False) / 100
     cycles = int.from_bytes(buffer[12:14], byteorder='big', signed=False) 
 
     soc =  buffer[23]
     ntc_count =  buffer[26]
-    print(' ntc_count=' + str(ntc_count), flush=True)
+  #  print(' ntc_count=' + str(ntc_count), flush=True)
         
 
     temp  = []
@@ -120,7 +125,8 @@ def get_battery_state():
     json = '{'
     json += '"voltage":' + str(voltage) + ','
     json += '"current":' + str(current) + ','
-    json += '"power":' + str(power) + ','
+    json += '"power_charging":' + str(power_charging) + ','  
+    json += '"power_discharging":' + str(power_discharging) + ','   
     json += '"remaining_capacity":' + str(remaining_capacity) + ','
     json += '"nominal_capacity":' + str(nominal_capacity) + ','
     json += '"cycles":' + str(cycles) + ','

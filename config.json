@@ -1,8 +1,8 @@
 {
     "name": "DCC Smart BMS",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "slug": "dcc-bms",
-    "description": "Monitors a Smart BMS through UART USB",
+    "description": "Monitors a QUCC Smart BMS through UART USB",
     "arch": ["amd64", "armv7", "i386"],
     "startup": "application",
     "boot": "auto",
@@ -13,11 +13,10 @@
         "mqtt_server": "core-mosquitto",
         "mqtt_user": "mqtt",
         "mqtt_pass": "mqtt",
-        "mqtt_client_id": "dalybms",
+        "mqtt_client_id": "quccbms",
         "mqtt_discovery_prefix": "homeassistant",
         "device": "/dev/ttyUSB0",
-        "device_id": "Daly-Smart-BMS",
-        "cells_in_series": 4
+        "device_id": "QUCC-Smart-BMS"
     },
     "schema": {
         "mqtt_server": "str",
@@ -26,7 +25,6 @@
         "mqtt_client_id": "str",
         "mqtt_discovery_prefix": "str",
         "device": "str",
-        "device_id": "str",
-        "cells_in_series": "int(1,)"
+        "device_id": "str"
     }
 }
