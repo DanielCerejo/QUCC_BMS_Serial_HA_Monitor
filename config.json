@@ -1,6 +1,6 @@
 {
     "name": "QUCC Smart BMS Serial (USB) Monitor",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "slug": "dcc-bms",
     "description": "Monitors a QUCC Smart BMS through UART USB",
     "arch": ["amd64", "armv7", "i386"],

@@ -1,15 +1,21 @@
 #!/usr/bin/python3
 
 
+
+
 import serial
 import binascii
 import time
 import os
 import paho.mqtt.client as mqtt
+from datetime import datetime
 
 tempconfigpublished = False
+BMS_Online = False
 
-print('Starting QUCC Serial BMS monitor...', flush=True)
+
+
+print(datetime.now(),'Starting QUCC Serial BMS monitor...', flush=True)
 
 # ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)  # open serial port
 #ser = serial.Serial(os.environ['DEVICE'], 9600, timeout=3, write_timeout=2, exclusive=True)  # open serial port
@@ -65,7 +71,7 @@ def cmd(command):
     s = ser.read(50)
     if (s == b''):
         return res        
-  #  print(binascii.hexlify(s, ' '), flush=True)
+  #  print(datetime.now(),binascii.hexlify(s, ' '), flush=True)
     res.append(s)
     return res
 
@@ -73,21 +79,29 @@ def publish(topic, data):
     try:
         client.publish(topic, data, 0, False)
     except Exception as e:
-        print("Error sending to mqtt: " + str(e))
+        print(datetime.now(),"Error sending to mqtt: " + str(e))
 
 
 
 def get_battery_state():
+    global BMS_Online
+
     res = cmd(b'\xdd\xa5\x03\x00\xff\xfd\x77')
     if len(res) < 1:
-        print('Empty response get_battery_state', flush=True)
+        if BMS_Online != False:
+            BMS_Online = False
+            print(datetime.now(),'Empty response get_battery_state. BMS Offline. Low power mode?', flush=True)
         return
     
     buffer = res[0]
 
     if len(buffer) < 27:
-        print(' response to short', flush=True)
+        print(datetime.now(),' response to short', flush=True)
         return
+
+    if BMS_Online != True:
+            BMS_Online = True
+            print(datetime.now(),'BMS Online!', flush=True)
 
     voltage = int.from_bytes(buffer[4:6], byteorder='big', signed=False) / 100
     current = int.from_bytes(buffer[6:8], byteorder='big', signed=True) / 100
@@ -96,7 +110,7 @@ def get_battery_state():
     power_discharging=0
     if power>0:
         power_charging=power
-    else:
+    if power<0:
         power_discharging=-power
 
     remaining_capacity = int.from_bytes(buffer[8:10], byteorder='big', signed=False) / 100
@@ -105,7 +119,7 @@ def get_battery_state():
 
     soc =  buffer[23]
     ntc_count =  buffer[26]
-  #  print(' ntc_count=' + str(ntc_count), flush=True)
+  #  print(datetime.now(),' ntc_count=' + str(ntc_count), flush=True)
         
 
     temp  = []
@@ -135,7 +149,7 @@ def get_battery_state():
     for i in range(ntc_count):
            json +=  ', "temp_' + str(i) + '":' + str(temp[i]) 
     json += '}'
-   # print(json)
+   # print(datetime.now(),json)
     publish(STATE_TOPIC +'/state', json)
 
 
@@ -147,4 +161,4 @@ while True:
     time.sleep(30)
     
 ser.close()
-print('done')
+print(datetime.now(),'done')
