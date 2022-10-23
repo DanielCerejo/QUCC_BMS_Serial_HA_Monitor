@@ -1,4 +1,4 @@
-# HA Addon for QUCC Smart BMS
+# HA Add-on for QUCC Smart BMS
 
 Home assistant addon that monitors QUCC BMS via SERIAL interface
 

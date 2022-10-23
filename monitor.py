@@ -91,6 +91,12 @@ def get_battery_state():
         if BMS_Online != False:
             BMS_Online = False
             print(datetime.now(),'Empty response get_battery_state. BMS Offline. Low power mode?', flush=True)
+            json = '{'
+            json += '"current": 0 ,'            
+            json += '"power_charging": 0 ,'  
+            json += '"power_discharging": 0'   
+            json += '}'
+            publish(STATE_TOPIC +'/state', json)
         return
     
     buffer = res[0]
