@@ -10,10 +10,19 @@ import os
 import paho.mqtt.client as mqtt
 from datetime import datetime
 
-tempconfigpublished = False
-BMS_Online = False
-
-
+tempconfigpublished=False
+BMS_Online=False
+voltage=0
+current=0
+power_charging=0
+power_discharging =0
+remaining_capacity=0
+nominal_capacity=0
+cycles=0
+soc=0
+temp_avg=0
+temp= []
+ntc_count=0
 
 print(datetime.now(),'Starting QUCC Serial BMS monitor...', flush=True)
 
@@ -84,63 +93,78 @@ def publish(topic, data):
 
 
 def get_battery_state():
+
     global BMS_Online
+
+    global voltage
+    global current
+    global power_charging
+    global power_discharging
+    global remaining_capacity
+    global nominal_capacity
+    global cycles
+    global soc
+    global temp_avg
+    global temp
+    global ntc_count
 
     res = cmd(b'\xdd\xa5\x03\x00\xff\xfd\x77')
     if len(res) < 1:
-        if BMS_Online != False:
-            BMS_Online = False
-            print(datetime.now(),'Empty response get_battery_state. BMS Offline. Low power mode?', flush=True)
-            json = '{'
-            json += '"current": 0 ,'            
-            json += '"power_charging": 0 ,'  
-            json += '"power_discharging": 0'   
-            json += '}'
-            publish(STATE_TOPIC +'/state', json)
-        return
+
+        if BMS_Online == False:
+            return
+        BMS_Online = False
+        print(datetime.now(),'Empty response get_battery_state. BMS Offline. Low power mode?', flush=True)
+        current=0
+        power_charging=0
+        power_discharging=0        
+
+    else :
     
-    buffer = res[0]
+        buffer = res[0]
 
-    if len(buffer) < 27:
-        print(datetime.now(),' response to short', flush=True)
-        return
+        if len(buffer) < 27:
+            print(datetime.now(),' response to short', flush=True)
+            return
 
-    if BMS_Online != True:
-            BMS_Online = True
-            print(datetime.now(),'BMS Online!', flush=True)
+        if BMS_Online != True:
+                BMS_Online = True
+                print(datetime.now(),'BMS Online!', flush=True)
 
-    voltage = int.from_bytes(buffer[4:6], byteorder='big', signed=False) / 100
-    current = int.from_bytes(buffer[6:8], byteorder='big', signed=True) / 100
-    power = round(voltage * current, 2)
-    power_charging=0
-    power_discharging=0
-    if power>0:
-        power_charging=power
-    if power<0:
-        power_discharging=-power
+        voltage = int.from_bytes(buffer[4:6], byteorder='big', signed=False) / 100
+        current = int.from_bytes(buffer[6:8], byteorder='big', signed=True) / 100
+        power = round(voltage * current, 2)
+        power_charging=0
+        power_discharging=0
+        if power>0:
+            power_charging=power
+        if power<0:
+            power_discharging=-power
 
-    remaining_capacity = int.from_bytes(buffer[8:10], byteorder='big', signed=False) / 100
-    nominal_capacity = int.from_bytes(buffer[10:12], byteorder='big', signed=False) / 100
-    cycles = int.from_bytes(buffer[12:14], byteorder='big', signed=False) 
+        remaining_capacity = int.from_bytes(buffer[8:10], byteorder='big', signed=False) / 100
+        nominal_capacity = int.from_bytes(buffer[10:12], byteorder='big', signed=False) / 100
+        cycles = int.from_bytes(buffer[12:14], byteorder='big', signed=False) 
 
-    soc =  buffer[23]
-    ntc_count =  buffer[26]
-  #  print(datetime.now(),' ntc_count=' + str(ntc_count), flush=True)
+        soc =  buffer[23]
+        ntc_count =  buffer[26]
+    #  print(datetime.now(),' ntc_count=' + str(ntc_count), flush=True)
+            
+
+        temp  = []
+        sum = 0
+        for i in range(ntc_count):
+            temp.append( int.from_bytes(buffer[27+(i*2):29+(i*2)], byteorder='big', signed=False) )
+            temp[i] = temp[i] - 2731
+            temp[i] = temp[i] /10
+            sum += temp[i]
+            global tempconfigpublished
+            if tempconfigpublished!=True :  
+                tempHaConf = '{"device_class": "temperature", "name": "Battery Temperature '+ str(i) + '", "state_topic": "' + STATE_TOPIC + '/state", "unit_of_measurement": "°C", "value_template": "{{ value_json.temp_' + str(i) +'}}", "unique_id": "' + devId + '_current'+ str(i) + '", ' + deviceConf + '}' 
+                client.publish(STATE_TOPIC + '_temperature_'+str(i) +'/config', tempHaConf, 0, True)
         
+        tempconfigpublished=True
+        temp_avg = round(sum/ntc_count,1)
 
-    temp  = []
-    sum = 0
-    for i in range(ntc_count):
-        temp.append( int.from_bytes(buffer[27+(i*2):29+(i*2)], byteorder='big', signed=False) )
-        temp[i] = temp[i] - 2731
-        temp[i] = temp[i] /10
-        sum += temp[i]
-        global tempconfigpublished
-        if tempconfigpublished!=True :  
-            tempHaConf = '{"device_class": "temperature", "name": "Battery Temperature '+ str(i) + '", "state_topic": "' + STATE_TOPIC + '/state", "unit_of_measurement": "°C", "value_template": "{{ value_json.temp_' + str(i) +'}}", "unique_id": "' + devId + '_current'+ str(i) + '", ' + deviceConf + '}' 
-            client.publish(STATE_TOPIC + '_temperature_'+str(i) +'/config', tempHaConf, 0, True)
-    
-    tempconfigpublished=True
 
     json = '{'
     json += '"voltage":' + str(voltage) + ','
@@ -151,7 +175,7 @@ def get_battery_state():
     json += '"nominal_capacity":' + str(nominal_capacity) + ','
     json += '"cycles":' + str(cycles) + ','
     json += '"soc":' + str(soc) + ','
-    json += '"temp_avg":' + str(round(sum/ntc_count,1))    
+    json += '"temp_avg":' + str(temp_avg)    
     for i in range(ntc_count):
            json +=  ', "temp_' + str(i) + '":' + str(temp[i]) 
     json += '}'
