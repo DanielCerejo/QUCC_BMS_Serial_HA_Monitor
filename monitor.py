@@ -11,6 +11,7 @@ import paho.mqtt.client as mqtt
 from datetime import datetime
 
 tempconfigpublished=False
+cellvoltagepublished=False
 BMS_Online=False
 voltage=0
 current=0
@@ -22,6 +23,7 @@ cycles=0
 soc=0
 temp_avg=0
 temp= []
+cell_voltage = []
 ntc_count=0
 
 print(datetime.now(),'Starting QUCC Serial BMS monitor...', flush=True)
@@ -72,12 +74,12 @@ client.publish(STATE_TOPIC + '_temperature_avg/config', tempAvgHaConf, 0, True)
 
 
 
-def cmd(command):
+def cmd(command, RxLen):
     res = []
     ser.reset_input_buffer()
     ser.write(command)
 #    ser.flush()
-    s = ser.read(50)
+    s = ser.read(RxLen)
     if (s == b''):
         return res        
   #  print(datetime.now(),binascii.hexlify(s, ' '), flush=True)
@@ -108,7 +110,7 @@ def get_battery_state():
     global temp
     global ntc_count
 
-    res = cmd(b'\xdd\xa5\x03\x00\xff\xfd\x77')
+    res = cmd(b'\xdd\xa5\x03\x00\xff\xfd\x77',50)
     if len(res) < 1:
 
         if BMS_Online == False:
@@ -159,7 +161,7 @@ def get_battery_state():
             sum += temp[i]
             global tempconfigpublished
             if tempconfigpublished!=True :  
-                tempHaConf = '{"device_class": "temperature", "name": "Battery Temperature '+ str(i) + '", "state_topic": "' + STATE_TOPIC + '/state", "unit_of_measurement": "°C", "value_template": "{{ value_json.temp_' + str(i) +'}}", "unique_id": "' + devId + '_current'+ str(i) + '", ' + deviceConf + '}' 
+                tempHaConf = '{"device_class": "temperature", "name": "Battery Temperature '+ str(i) + '", "state_topic": "' + STATE_TOPIC + '/state", "unit_of_measurement": "°C", "value_template": "{{ value_json.temp_' + str(i) +'}}", "unique_id": "' + devId + '_temp_'+ str(i) + '", ' + deviceConf + '}' 
                 client.publish(STATE_TOPIC + '_temperature_'+str(i) +'/config', tempHaConf, 0, True)
         
         tempconfigpublished=True
@@ -184,9 +186,49 @@ def get_battery_state():
 
 
 
+
+def get_individual_cell_voltage():
+
+    global cell_voltage
+
+    res = cmd(b'\xdd\xa5\x04\x00\xff\xfc\x77',55) #for 24s (4+2*24+3)
+    if len(res) > 0:
+        
+        buffer = res[0]
+
+        if len(buffer) < 9: # min 1 cell
+            print(datetime.now(),' response to short', flush=True)
+            return
+
+        n_cells =  int((len(buffer)-7)/2)
+                
+        cell_voltage  = []
+        for i in range(n_cells):
+            cell_voltage.append( int.from_bytes(buffer[4+(i*2):6+(i*2)], byteorder='big', signed=False) )
+            cell_voltage[i] = cell_voltage[i]/1000
+            global cellvoltagepublished
+            if cellvoltagepublished!=True :  
+                tempCellConf = '{"device_class": "voltage", "name": "Battery Cell '+ str(i+1).zfill(2) + '", "state_topic": "' + STATE_TOPIC + '/state_cell", "unit_of_measurement": "V", "value_template": "{{ value_json.cell_' + str(i+1).zfill(2) +'}}", "unique_id": "' + devId + '_cell_'+ str(i+1).zfill(2) + '", ' + deviceConf + '}' 
+                client.publish(STATE_TOPIC + '_cell_'+str(i+1).zfill(2) +'/config', tempCellConf, 0, True)
+        
+        cellvoltagepublished=True
+
+
+
+        json = '{ "cells":' + str(n_cells) 
+        for i in range(n_cells):
+            json +=  ', "cell_' + str(i+1).zfill(2) + '":' + str(cell_voltage[i]) 
+        json += '}'
+    # print(datetime.now(),json)
+        publish(STATE_TOPIC +'/state_cell', json)
+
+
+
+
 while True:
     ser = serial.Serial(os.environ['DEVICE'], 9600, timeout=2, write_timeout=2, exclusive=True)  # open serial port
     get_battery_state()
+    get_individual_cell_voltage()
     ser.close()
     time.sleep(30)
     
