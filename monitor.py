@@ -24,6 +24,8 @@ soc=0
 temp_avg=0
 temp= []
 cell_voltage = []
+cell_voltageMin=100
+cell_voltageMax=0
 ntc_count=0
 
 print(datetime.now(),'Starting QUCC Serial BMS monitor...', flush=True)
@@ -76,13 +78,18 @@ client.publish(STATE_TOPIC + '_temperature_avg/config', tempAvgHaConf, 0, True)
 
 def cmd(command, RxLen):
     res = []
-    ser.reset_input_buffer()
+#        print(datetime.now(), binascii.hexlify(command, ' '), flush=True)
+
     ser.write(command)
-#    ser.flush()
+    ser.flush()
+    ser.reset_input_buffer()
+
     s = ser.read(RxLen)
     if (s == b''):
-        return res        
-  #  print(datetime.now(),binascii.hexlify(s, ' '), flush=True)
+        return res    
+     
+#        print(datetime.now(),binascii.hexlify(s, ' '), flush=True)
+
     res.append(s)
     return res
 
@@ -190,6 +197,8 @@ def get_battery_state():
 def get_individual_cell_voltage():
 
     global cell_voltage
+    global cell_voltageMax
+    global cell_voltageMin
 
     res = cmd(b'\xdd\xa5\x04\x00\xff\xfc\x77',55) #for 24s (4+2*24+3)
     if len(res) > 0:
@@ -203,14 +212,29 @@ def get_individual_cell_voltage():
         n_cells =  int((len(buffer)-7)/2)
                 
         cell_voltage  = []
+        cell_voltageMax = 0
+        cell_voltageMin = 100
+
         for i in range(n_cells):
             cell_voltage.append( int.from_bytes(buffer[4+(i*2):6+(i*2)], byteorder='big', signed=False) )
             cell_voltage[i] = cell_voltage[i]/1000
+
+            if cell_voltage[i] > cell_voltageMax :
+                cell_voltageMax = cell_voltage[i]
+
+            if cell_voltage[i] < cell_voltageMin :
+                cell_voltageMin = cell_voltage[i]                
+
             global cellvoltagepublished
             if cellvoltagepublished!=True :  
                 tempCellConf = '{"device_class": "voltage", "name": "Battery Cell '+ str(i+1).zfill(2) + '", "state_topic": "' + STATE_TOPIC + '/state_cell", "unit_of_measurement": "V", "value_template": "{{ value_json.cell_' + str(i+1).zfill(2) +'}}", "unique_id": "' + devId + '_cell_'+ str(i+1).zfill(2) + '", ' + deviceConf + '}' 
                 client.publish(STATE_TOPIC + '_cell_'+str(i+1).zfill(2) +'/config', tempCellConf, 0, True)
-        
+                if i==0 :
+                    tempCellConf = '{"device_class": "voltage", "name": "Battery Cell Min", "state_topic": "' + STATE_TOPIC + '/state_cell", "unit_of_measurement": "V", "value_template": "{{ value_json.cell_Min}}", "unique_id": "' + devId + '_cell_Min", ' + deviceConf + '}' 
+                    client.publish(STATE_TOPIC + '_cell_Min/config', tempCellConf, 0, True)
+                    tempCellConf = '{"device_class": "voltage", "name": "Battery Cell Max", "state_topic": "' + STATE_TOPIC + '/state_cell", "unit_of_measurement": "V", "value_template": "{{ value_json.cell_Max}}", "unique_id": "' + devId + '_cell_Max", ' + deviceConf + '}' 
+                    client.publish(STATE_TOPIC + '_cell_Max/config', tempCellConf, 0, True)
+
         cellvoltagepublished=True
 
 
@@ -218,6 +242,9 @@ def get_individual_cell_voltage():
         json = '{ "cells":' + str(n_cells) 
         for i in range(n_cells):
             json +=  ', "cell_' + str(i+1).zfill(2) + '":' + str(cell_voltage[i]) 
+
+        json +=  ', "cell_Min":' + str(cell_voltageMin) 
+        json +=  ', "cell_Max":' + str(cell_voltageMax) 
         json += '}'
     # print(datetime.now(),json)
         publish(STATE_TOPIC +'/state_cell', json)
