@@ -56,6 +56,9 @@ client.publish(STATE_TOPIC + '_voltage/config', voltageHaConf, 0, True)
 currentHaConf = '{"device_class": "current", "name": "Battery Current", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "A", "value_template": "{{ value_json.current}}", "unique_id": "' + devId + '_current", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_current/config', currentHaConf, 0, True)
 
+power_HaConf = '{"device_class": "power", "name": "Battery Power", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "W", "value_template": "{{ value_json.power}}", "unique_id": "' + devId + '_power", ' + deviceConf + '}' 
+client.publish(STATE_TOPIC + '_power/config', power_HaConf, 0, True)
+
 power_chargingHaConf = '{"device_class": "power", "name": "Battery Power Charging", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "W", "value_template": "{{ value_json.power_charging}}", "unique_id": "' + devId + '_power_charging", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_power_charging/config', power_chargingHaConf, 0, True)
 
@@ -178,6 +181,7 @@ def get_battery_state():
     json = '{'
     json += '"voltage":' + str(voltage) + ','
     json += '"current":' + str(current) + ','
+    json += '"power":' + str(power) + ','  
     json += '"power_charging":' + str(power_charging) + ','  
     json += '"power_discharging":' + str(power_discharging) + ','   
     json += '"remaining_capacity":' + str(remaining_capacity) + ','
