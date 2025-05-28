@@ -15,6 +15,7 @@ cellvoltagepublished=False
 BMS_Online=False
 voltage=0
 current=0
+power=0
 power_charging=0
 power_discharging =0
 remaining_capacity=0
@@ -128,6 +129,7 @@ def get_battery_state():
         BMS_Online = False
         print(datetime.now(),'Empty response get_battery_state. BMS Offline. Low power mode?', flush=True)
         current=0
+        power=0
         power_charging=0
         power_discharging=0        
 
@@ -176,7 +178,7 @@ def get_battery_state():
         
         tempconfigpublished=True
         temp_avg = round(sum/ntc_count,1)
-
+        # end do if
 
     json = '{'
     json += '"voltage":' + str(voltage) + ','
