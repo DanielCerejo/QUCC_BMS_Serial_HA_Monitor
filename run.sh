@@ -8,4 +8,5 @@ MQTT_CLIENT_ID="$(jq --raw-output '.mqtt_client_id' $CONFIG_PATH)" \
 MQTT_DISCOVERY_PREFIX="$(jq --raw-output '.mqtt_discovery_prefix' $CONFIG_PATH)" \
 DEVICE="$(jq --raw-output '.device' $CONFIG_PATH)" \
 DEVICE_ID="$(jq --raw-output '.device_id' $CONFIG_PATH)" \
+DEVICE_POLLING_INTERVAL="$(jq --raw-output '.device_polling_interval' $CONFIG_PATH)" \
 python3 /monitor.py

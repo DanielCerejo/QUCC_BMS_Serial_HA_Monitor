@@ -257,13 +257,14 @@ def get_individual_cell_voltage():
 
 
 
+sleep_time = float(os.environ['DEVICE_POLLING_INTERVAL'])
 
 while True:
     ser = serial.Serial(os.environ['DEVICE'], 9600, timeout=2, write_timeout=2, exclusive=True)  # open serial port
     get_battery_state()
     get_individual_cell_voltage()
     ser.close()
-    time.sleep(30)
+    time.sleep(sleep_time)
     
 ser.close()
 print(datetime.now(),'done')

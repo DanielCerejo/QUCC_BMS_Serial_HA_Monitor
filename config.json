@@ -1,6 +1,6 @@
 {
     "name": "QUCC Smart BMS Serial (USB) Monitor",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "slug": "dcc-bms",
     "description": "Monitors a QUCC Smart BMS through UART USB",
     "arch": ["amd64", "armv7", "i386"],
@@ -16,7 +16,8 @@
         "mqtt_client_id": "quccbms",
         "mqtt_discovery_prefix": "homeassistant",
         "device": "/dev/ttyUSB0",
-        "device_id": "QUCC-Smart-BMS"
+        "device_id": "QUCC-Smart-BMS",
+        "device_polling_interval": 30
     },
     "schema": {
         "mqtt_server": "str",
@@ -25,6 +26,7 @@
         "mqtt_client_id": "str",
         "mqtt_discovery_prefix": "str",
         "device": "str",
-        "device_id": "str"
+        "device_id": "str",
+        "device_polling_interval": "int(5,120)"
     }
 }
