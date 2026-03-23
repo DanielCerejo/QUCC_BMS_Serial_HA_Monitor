@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.15 (2026-03-23)
+
+- Changed device class for battery capacity sensors from "current" to "energy_storage"
+
 ## 1.0.14 (2025-08-28)
 
 - Added support for /dev/ttyUSB1 device in addition to /dev/ttyUSB0

@@ -66,10 +66,10 @@ client.publish(STATE_TOPIC + '_power_charging/config', power_chargingHaConf, 0, 
 power_dischargeHaConf = '{"device_class": "power", "name": "Battery Power Discharging", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "W", "value_template": "{{ value_json.power_discharging}}", "unique_id": "' + devId + '_power_discharging", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_power_discharging/config', power_dischargeHaConf, 0, True)
 
-remaining_capacityHaConf = '{"device_class": "current", "name": "Battery Remaining Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Ah", "value_template": "{{ value_json.remaining_capacity}}", "unique_id": "' + devId + '_remaining_capacity", ' + deviceConf + '}' 
+remaining_capacityHaConf = '{"device_class": "energy_storage", "name": "Battery Remaining Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Ah", "value_template": "{{ value_json.remaining_capacity}}", "unique_id": "' + devId + '_remaining_capacity", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_remaining_capacity/config', remaining_capacityHaConf, 0, True)
 
-nominal_capacityHaConf = '{"device_class": "current", "name": "Battery Nominal Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Ah", "value_template": "{{ value_json.nominal_capacity}}", "unique_id": "' + devId + '_nominal_capacity", ' + deviceConf + '}' 
+nominal_capacityHaConf = '{"device_class": "energy_storage", "name": "Battery Nominal Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Ah", "value_template": "{{ value_json.nominal_capacity}}", "unique_id": "' + devId + '_nominal_capacity", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_nominal_capacity/config', nominal_capacityHaConf, 0, True)
 
 cyclesHaConf = '{"name": "Battery Cycles", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "", "value_template": "{{ value_json.cycles}}", "unique_id": "' + devId + '_cycles", ' + deviceConf + '}' 
