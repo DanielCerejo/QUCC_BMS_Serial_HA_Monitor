@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.16 (2026-03-23)
+
+- Added configurable nominal voltage for accurate Ah to Wh conversion
+- Battery capacity now correctly reported in Wh using nominal voltage (default 76.8V for 24S LiFePO4)
+- Added 'nominal_voltage' configuration option (supports 12V to 100V range)
+
 ## 1.0.15 (2026-03-23)
 
 - Changed device class for battery capacity sensors from "current" to "energy_storage"

@@ -19,7 +19,9 @@ power=0
 power_charging=0
 power_discharging =0
 remaining_capacity=0
+remaining_capacity_ah=0
 nominal_capacity=0
+nominal_capacity_ah=0
 cycles=0
 soc=0
 temp_avg=0
@@ -46,6 +48,9 @@ STATE_TOPIC = BASE_TOPIC + devId
 STATUS_TOPIC = STATE_TOPIC + '_status'
 deviceConf = '"device": {"manufacturer": "unknow", "name": "Smart BMS", "identifiers": ["' + devId + '"]}'
 
+# Nominal voltage for Ah to Wh conversion (default 76.8V for 24S LiFePO4)
+NOMINAL_VOLTAGE = float(os.environ.get('NOMINAL_VOLTAGE', '76.8'))
+
 
 # publish MQTT Discovery configs to Home Assistant
 socHaConf = '{"device_class": "battery", "name": "Battery SOC", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "%", "value_template": "{{ value_json.soc}}", "unique_id": "' + devId + '_soc", ' + deviceConf + ', "json_attributes_topic": "' + STATUS_TOPIC + '/state"}' 
@@ -66,10 +71,10 @@ client.publish(STATE_TOPIC + '_power_charging/config', power_chargingHaConf, 0, 
 power_dischargeHaConf = '{"device_class": "power", "name": "Battery Power Discharging", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "W", "value_template": "{{ value_json.power_discharging}}", "unique_id": "' + devId + '_power_discharging", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_power_discharging/config', power_dischargeHaConf, 0, True)
 
-remaining_capacityHaConf = '{"device_class": "energy_storage", "name": "Battery Remaining Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Ah", "value_template": "{{ value_json.remaining_capacity}}", "unique_id": "' + devId + '_remaining_capacity", ' + deviceConf + '}' 
+remaining_capacityHaConf = '{"device_class": "energy_storage", "name": "Battery Remaining Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Wh", "value_template": "{{ value_json.remaining_capacity}}", "unique_id": "' + devId + '_remaining_capacity", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_remaining_capacity/config', remaining_capacityHaConf, 0, True)
 
-nominal_capacityHaConf = '{"device_class": "energy_storage", "name": "Battery Nominal Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Ah", "value_template": "{{ value_json.nominal_capacity}}", "unique_id": "' + devId + '_nominal_capacity", ' + deviceConf + '}' 
+nominal_capacityHaConf = '{"device_class": "energy_storage", "name": "Battery Nominal Capacity", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "Wh", "value_template": "{{ value_json.nominal_capacity}}", "unique_id": "' + devId + '_nominal_capacity", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC + '_nominal_capacity/config', nominal_capacityHaConf, 0, True)
 
 cyclesHaConf = '{"name": "Battery Cycles", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "", "value_template": "{{ value_json.cycles}}", "unique_id": "' + devId + '_cycles", ' + deviceConf + '}' 
@@ -114,7 +119,9 @@ def get_battery_state():
     global power_charging
     global power_discharging
     global remaining_capacity
+    global remaining_capacity_ah
     global nominal_capacity
+    global nominal_capacity_ah
     global cycles
     global soc
     global temp_avg
@@ -155,8 +162,11 @@ def get_battery_state():
         if power<0:
             power_discharging=-power
 
-        remaining_capacity = int.from_bytes(buffer[8:10], byteorder='big', signed=False) / 100
-        nominal_capacity = int.from_bytes(buffer[10:12], byteorder='big', signed=False) / 100
+        # Capacity from BMS is in Ah (divided by 100), convert to Wh using nominal voltage
+        remaining_capacity_ah = int.from_bytes(buffer[8:10], byteorder='big', signed=False) / 100
+        nominal_capacity_ah = int.from_bytes(buffer[10:12], byteorder='big', signed=False) / 100
+        remaining_capacity = round(remaining_capacity_ah * NOMINAL_VOLTAGE, 2)
+        nominal_capacity = round(nominal_capacity_ah * NOMINAL_VOLTAGE, 2)
         cycles = int.from_bytes(buffer[12:14], byteorder='big', signed=False) 
 
         soc =  buffer[23]
