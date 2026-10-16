@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.17 (2026-10-16)
+
+- Verify the checksum of every BMS answer (16 bit `0xffff - sum + 1`, as in the
+  "Smart BMS" protocol) plus header, command echo, `0x77` trailer and length
+- Corrupted answers are requested again (up to 3 attempts) and are no
+  longer decoded as if they were good data
+- Add 'verify_crc' and 'debug_frames' configuration options
+
 ## 1.0.16 (2026-03-23)
 
 - Added configurable nominal voltage for accurate Ah to Wh conversion

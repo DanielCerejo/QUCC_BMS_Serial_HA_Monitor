@@ -1,9 +1,9 @@
 {
     "name": "QUCC Smart BMS Serial (USB) Monitor",
-    "version": "1.0.16",
+    "version": "1.0.17",
     "slug": "dcc-bms",
     "description": "Monitors a QUCC Smart BMS through UART USB",
-    "arch": ["amd64", "armv7", "i386"],
+    "arch": ["amd64", "aarch64"],
     "startup": "application",
     "boot": "auto",
     "privileged": ["SYS_RAWIO"],
@@ -18,7 +18,9 @@
         "device": "/dev/ttyUSB0",
         "device_id": "QUCC-Smart-BMS",
         "device_polling_interval": 30,
-        "nominal_voltage": 76.8
+        "nominal_voltage": 76.8,
+        "verify_crc": true,
+        "debug_frames": false
     },
     "schema": {
         "mqtt_server": "str",
@@ -29,6 +31,8 @@
         "device": "str",
         "device_id": "str",
         "device_polling_interval": "int(5,120)",
-        "nominal_voltage": "float(12.0,100.0)"
+        "nominal_voltage": "float(12.0,100.0)",
+        "verify_crc": "bool",
+        "debug_frames": "bool"
     }
 }

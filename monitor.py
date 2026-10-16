@@ -45,15 +45,18 @@ client.loop_start()
 devId = os.environ['DEVICE_ID']
 BASE_TOPIC = os.environ['MQTT_DISCOVERY_PREFIX'] + '/sensor/'
 STATE_TOPIC = BASE_TOPIC + devId
-STATUS_TOPIC = STATE_TOPIC + '_status'
 deviceConf = '"device": {"manufacturer": "unknow", "name": "Smart BMS", "identifiers": ["' + devId + '"]}'
 
 # Nominal voltage for Ah to Wh conversion (default 76.8V for 24S LiFePO4)
 NOMINAL_VOLTAGE = float(os.environ.get('NOMINAL_VOLTAGE', '76.8'))
 
+# requests of the "Smart BMS" protocol, checksum documented in the frame notes
+CMD_BATTERY_STATE = b'\xdd\xa5\x03\x00\xff\xfd\x77'
+CMD_CELL_VOLTAGES = b'\xdd\xa5\x04\x00\xff\xfc\x77'
+
 
 # publish MQTT Discovery configs to Home Assistant
-socHaConf = '{"device_class": "battery", "name": "Battery SOC", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "%", "value_template": "{{ value_json.soc}}", "unique_id": "' + devId + '_soc", ' + deviceConf + ', "json_attributes_topic": "' + STATUS_TOPIC + '/state"}' 
+socHaConf = '{"device_class": "battery", "name": "Battery SOC", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "%", "value_template": "{{ value_json.soc}}", "unique_id": "' + devId + '_soc", ' + deviceConf + '}' 
 client.publish(STATE_TOPIC +'_soc/config', socHaConf, 0, True)
 
 voltageHaConf = '{"device_class": "voltage", "name": "Battery Voltage", "state_topic": "' + STATE_TOPIC +'/state", "unit_of_measurement": "V", "value_template": "{{ value_json.voltage}}", "unique_id": "' + devId + '_voltage", ' + deviceConf + '}'
@@ -85,22 +88,128 @@ client.publish(STATE_TOPIC + '_temperature_avg/config', tempAvgHaConf, 0, True)
 
 
 
-def cmd(command, RxLen):
-    res = []
-#        print(datetime.now(), binascii.hexlify(command, ' '), flush=True)
 
-    ser.write(command)
-    ser.flush()
-    ser.reset_input_buffer()
+# ---------------------------------------------------------------------------
+# Frame validation
+#
+# The BMS speaks the "Smart BMS" (QUCC) serial protocol:
+#
+#   request : dd a5 <cmd> <len>    <payload...> <crc_hi> <crc_lo> 77
+#   answer  : dd <cmd> <status> <len> <payload...> <crc_hi> <crc_lo> 77
+#
+# The checksum is not a polynomial CRC but the 16 bit two's complement of the
+# byte sum (0xffff - sum + 1), sent big endian, as documented in
+# https://github.com/KrystianD/smart_bms (smart_bms/SmartBMSClient.py).
+#
+# The requests sent here cover <cmd> and everything after it (checked at start
+# up by selftest_requests). The answers cover <status> <len> <payload>, which
+# is what the BMS firmware really sends (confirmed on captured frames).
+# ---------------------------------------------------------------------------
 
-    s = ser.read(RxLen)
-    if (s == b''):
-        return res    
-     
-#        print(datetime.now(),binascii.hexlify(s, ' '), flush=True)
+FRAME_START = 0xdd
+FRAME_TAIL = 0x77
+CHECKSUM_LEN = 2             # 16 bit checksum, big endian, in front of the 0x77
+CRC_RETRIES = 3              # attempts per request before giving up on a corrupted answer
+CHECKSUM_START = 2           # answers: checksum covers <status> <len> <payload>
 
-    res.append(s)
-    return res
+
+def _env_flag(name, default):
+    value = os.environ.get(name, '').strip().lower()
+    if value in ('', 'null', 'none'):        # option missing from options.json
+        value = default
+    return value in ('1', 'true', 'yes', 'on')
+
+
+VERIFY_CRC = _env_flag('VERIFY_CRC', 'true')
+DEBUG_FRAMES = _env_flag('DEBUG_FRAMES', 'false')
+
+frames_bad = 0
+
+
+def _hex(data):
+    return binascii.hexlify(bytes(data), b' ').decode()
+
+
+def _crc16(data):
+    """Protocol checksum: 0xffff - sum(data) + 1, sent big endian."""
+    return (0x10000 - sum(data)) & 0xFFFF
+
+
+def _crc_in_frame(buffer):
+    return (buffer[-CHECKSUM_LEN - 1] << 8) | buffer[-CHECKSUM_LEN]
+
+
+def _crc_of_frame(buffer, offset):
+    return _crc16(buffer[offset:-CHECKSUM_LEN - 1])
+
+
+def selftest_requests(*requests):
+    """Verify the hardcoded requests carry a checksum built the documented way."""
+    for request in requests:
+        want = _crc_of_frame(request, 2)
+        if want != _crc_in_frame(request):
+            print(datetime.now(), 'WARNING: request %s should end with %04x, please report'
+                  % (_hex(request), want), flush=True)
+
+
+def _check_checksum(buffer):
+    """Return None when the checksum is fine, otherwise a short description."""
+    got = _crc_in_frame(buffer)
+    want = _crc_of_frame(buffer, CHECKSUM_START)
+    if want == got:
+        return None
+    return 'checksum mismatch (want 0x%04x got 0x%04x)' % (want, got)
+
+
+def validate_frame(buffer, expect_cmd, min_len):
+    """Return None when the frame looks good, otherwise a short description."""
+    if len(buffer) < min_len:
+        return 'frame too short (%d bytes)' % len(buffer)
+    if buffer[0] != FRAME_START:
+        return 'bad header 0x%02x' % buffer[0]
+    if expect_cmd is not None and buffer[1] != expect_cmd:
+        return 'unexpected command echo 0x%02x' % buffer[1]
+    if buffer[2] != 0x00:
+        return 'BMS error status 0x%02x' % buffer[2]
+    if buffer[-1] != FRAME_TAIL:
+        return 'bad trailer 0x%02x' % buffer[-1]
+    if VERIFY_CRC and len(buffer) >= 8:
+        return _check_checksum(buffer)
+    return None
+
+
+def cmd(command, RxLen, expect_cmd=None, min_len=0):
+    """Send a request and return [frame] when the answer validates.
+
+    Returns [] when the BMS did not answer at all (sleeping BMS) and None when
+    every answer received was corrupt, so callers can tell the two apart.
+    """
+    global frames_bad
+
+    for attempt in range(1, CRC_RETRIES + 1):
+        ser.write(command)
+        ser.flush()
+        ser.reset_input_buffer()
+
+        s = ser.read(RxLen)
+        if (s == b''):
+            if attempt == 1:
+                return []
+            continue
+
+        if DEBUG_FRAMES:
+            print(datetime.now(), 'rx', _hex(s), flush=True)
+
+        problem = validate_frame(s, expect_cmd, min_len)
+        if problem is None:
+            return [s]
+
+        frames_bad += 1
+        if DEBUG_FRAMES or frames_bad <= 10 or frames_bad % 100 == 0:
+            print(datetime.now(), 'bad frame (%d/%d): %s [%s]' %
+                  (attempt, CRC_RETRIES, problem, _hex(s)), flush=True)
+
+    return None
 
 def publish(topic, data):
     try:
@@ -127,8 +236,12 @@ def get_battery_state():
     global temp_avg
     global temp
     global ntc_count
+    global power
 
-    res = cmd(b'\xdd\xa5\x03\x00\xff\xfd\x77',50)
+    res = cmd(CMD_BATTERY_STATE, 50, 0x03, 30)
+    if res is None:
+        # corrupt answer after all retries, keep publishing the last known state
+        return
     if len(res) < 1:
 
         if BMS_Online == False:
@@ -216,7 +329,9 @@ def get_individual_cell_voltage():
     global cell_voltageMax
     global cell_voltageMin
 
-    res = cmd(b'\xdd\xa5\x04\x00\xff\xfc\x77',55) #for 24s (4+2*24+3)
+    res = cmd(CMD_CELL_VOLTAGES, 55, 0x04, 9)  # for 24s (4+2*24+3)
+    if res is None:
+        return
     if len(res) > 0:
         
         buffer = res[0]
@@ -268,6 +383,8 @@ def get_individual_cell_voltage():
 
 
 sleep_time = float(os.environ['DEVICE_POLLING_INTERVAL'])
+
+selftest_requests(CMD_BATTERY_STATE, CMD_CELL_VOLTAGES)
 
 while True:
     ser = serial.Serial(os.environ['DEVICE'], 9600, timeout=2, write_timeout=2, exclusive=True)  # open serial port

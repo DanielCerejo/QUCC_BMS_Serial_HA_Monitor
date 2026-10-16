@@ -10,4 +10,6 @@ DEVICE="$(jq --raw-output '.device' $CONFIG_PATH)" \
 DEVICE_ID="$(jq --raw-output '.device_id' $CONFIG_PATH)" \
 DEVICE_POLLING_INTERVAL="$(jq --raw-output '.device_polling_interval' $CONFIG_PATH)" \
 NOMINAL_VOLTAGE="$(jq --raw-output '.nominal_voltage' $CONFIG_PATH)" \
+VERIFY_CRC="$(jq --raw-output '.verify_crc' $CONFIG_PATH)" \
+DEBUG_FRAMES="$(jq --raw-output '.debug_frames' $CONFIG_PATH)" \
 python3 /monitor.py
