@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.18 (2026-10-16)
+
+- Fix the image build failing with "base name ($BUILD_FROM) should not be
+  blank": Supervisor 2026.04.0 stopped passing BUILD_FROM, so the Dockerfile now
+  gives the ARG a default, `ghcr.io/home-assistant/base:3.24` (Alpine, pinned,
+  multi architecture amd64/aarch64, replacing the unpinned per architecture
+  `homeassistant/<arch>-base`)
+- Stay on the plain `base` image instead of `base-python`: the latter compiles
+  CPython into /usr/local, which cannot see the `py3-pyserial` and
+  `py3-paho-mqtt` packages installed by apk
+- Drop the unused requirements.txt and the `rm -fr /root/.cache` step
+
 ## 1.0.17 (2026-10-16)
 
 - Verify the checksum of every BMS answer (16 bit `0xffff - sum + 1`, as in the
